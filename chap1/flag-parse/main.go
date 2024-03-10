@@ -1,18 +1,17 @@
-// chap1/manual-parse/main.go
 package main
 
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 )
 
 type config struct {
-	numTimes   int  // 출력 인사 횟수
-	printUsage bool // 안내 문구를 출력할지 지정하는 boolean
+	numTimes int // 출력 인사 횟수
+
 }
 
 var usageString = fmt.Sprintf(`Usage: %s <integer> [-h | --help]
@@ -29,25 +28,22 @@ func validateArgs(c config) error {
 	return nil
 }
 
-func parseArgs(args []string) (config, error) { // args = 커맨드 라인 인수의 문자열 슬라이스
-	var numTimes int
-	var err error
+func parseArgs(w io.Writer, args []string) (config, error) {
 	c := config{}
-	if len(args) != 1 {
-		return c, errors.New("Invalid number of arguments")
-	}
-
-	if args[0] == "-h" || args[0] == "--help" {
-		c.printUsage = true
-		return c, nil
-	}
-
-	numTimes, err = strconv.Atoi(args[0]) // 숫자의 문자열을 정수로 변환하는 것
+	// flagSet 객체 생성
+	fs := flag.NewFlagSet("greeter", flag.ContinueOnError)
+	fs.SetOutput(w)
+	// 첫 번째 flag 옵션 정의
+	fs.IntVar(&c.numTimes, "n", 0, "Number of times to greet")
+	err := fs.Parse(args)
 	if err != nil {
 		return c, err
 	}
-	c.numTimes = numTimes
-
+	// NArg() 메소드 : 플래그 옵션이 파싱된 이후에 주어진 위치 인수의 개수를 반환
+	// 이 프로그램은 별도의 위치 인수를 필요로 하지 않으므로, 하나 이상의 값이 지정된 경우 에러를 출
+	if fs.NArg() != 0 {
+		return c, errors.New("Positional arguments specified")
+	}
 	return c, nil
 }
 
@@ -79,10 +75,6 @@ func greetUser(c config, name string, w io.Writer) {
 }
 
 func runCmd(r io.Reader, w io.Writer, c config) error {
-	if c.printUsage {
-		printUsage(w)
-		return nil
-	}
 
 	name, err := getName(r, w)
 	if err != nil {
@@ -94,7 +86,7 @@ func runCmd(r io.Reader, w io.Writer, c config) error {
 }
 
 func main() {
-	c, err := parseArgs(os.Args[1:])
+	c, err := parseArgs(os.Stderr, os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stdout, err)
 		printUsage(os.Stdout)
